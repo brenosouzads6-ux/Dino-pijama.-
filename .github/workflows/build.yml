@@ -1,0 +1,59 @@
+name: Gerar APK
+
+on:
+  push:
+    paths:
+      - "DinoPijamaAndroid-Projeto.zip"
+      - ".github/workflows/build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Descompactar projeto
+        run: |
+          rm -rf proj
+          unzip -q DinoPijamaAndroid-Projeto.zip -d proj
+          ls -R proj | head -50
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.4"
+
+      - name: Gerar APK (debug)
+        working-directory: proj
+        run: gradle assembleDebug --stacktrace
+
+      - name: Verificar APK gerado
+        run: |
+          find proj -name "*.apk"
+          cp proj/app/build/outputs/apk/debug/app-debug.apk DinoPijama-atualizado.apk
+
+      - name: Disponibilizar APK (artefato deste workflow)
+        uses: actions/upload-artifact@v4
+        with:
+          name: dino-pijama-apk
+          path: DinoPijama-atualizado.apk
+
+      # Faz commit do APK atualizado na raiz do repositório. Isso dispara
+      # automaticamente o workflow "Publicar APK atualizado" (apk.yml),
+      # que já escuta mudanças em DinoPijama-atualizado.apk.
+      - name: Commitar APK atualizado no repositório
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add DinoPijama-atualizado.apk
+          git diff --cached --quiet && echo "Nada novo para commitar" || (git commit -m "Atualiza APK gerado automaticamente" && git push)
